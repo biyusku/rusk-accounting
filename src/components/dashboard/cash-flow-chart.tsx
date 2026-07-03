@@ -21,7 +21,11 @@ const prevNet = trendData[trendData.length - 2]?.net ?? 0;
 const change = prevNet !== 0 ? ((lastNet - prevNet) / Math.abs(prevNet)) * 100 : 0;
 const isPositive = lastNet >= 0;
 
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+function CustomTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: { name: string; value: number; color: string }[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border bg-background shadow-lg p-3 text-sm min-w-[140px]">
@@ -57,15 +61,30 @@ export function CashFlowChart() {
         </div>
       </CardHeader>
       <CardContent className="pt-2">
-        <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis dataKey="month" tick={{ fontSize: 10 }} />
             <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 10 }} width={48} />
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-            <Line type="monotone" dataKey="gelir" name="Gelir" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 2.5 }} />
-            <Line type="monotone" dataKey="gider" name="Gider" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 2.5 }} strokeDasharray="4 2" />
+            <Line
+              type="monotone"
+              dataKey="gelir"
+              name="Gelir"
+              stroke="hsl(var(--chart-2))"
+              strokeWidth={2}
+              dot={{ r: 2.5 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="gider"
+              name="Gider"
+              stroke="hsl(var(--chart-1))"
+              strokeWidth={2}
+              dot={{ r: 2.5 }}
+              strokeDasharray="4 2"
+            />
           </LineChart>
         </ResponsiveContainer>
       </CardContent>

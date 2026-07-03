@@ -18,8 +18,41 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rusk Muhasebe",
-  description: "İş Bankası entegrasyonlu kurumsal muhasebe uygulaması",
+  title: {
+    default: "Rusk Muhasebe — Kurumsal Finans Yönetimi",
+    template: "%s | Rusk Muhasebe",
+  },
+  description:
+    "Türk işletmeleri için geliştirilmiş modern muhasebe uygulaması. Gelir/gider takibi, fatura yönetimi, banka entegrasyonu, FAST/EFT/Havale transferleri ve finansal raporlama.",
+  keywords: [
+    "muhasebe yazılımı",
+    "fatura yönetimi",
+    "gelir gider takibi",
+    "banka entegrasyonu",
+    "FAST EFT havale",
+    "finansal raporlama",
+    "kurumsal muhasebe",
+    "nakit akışı",
+    "rusk muhasebe",
+  ],
+  authors: [{ name: "Rusk" }],
+  creator: "Rusk",
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    title: "Rusk Muhasebe — Kurumsal Finans Yönetimi",
+    description:
+      "Türk işletmeleri için geliştirilmiş modern muhasebe uygulaması. Gelir/gider takibi, fatura yönetimi, banka entegrasyonu ve finansal raporlama.",
+    siteName: "Rusk Muhasebe",
+    images: [{ url: "/screenshots/dashboard.png", width: 1440, height: 900, alt: "Rusk Muhasebe Dashboard" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Rusk Muhasebe — Kurumsal Finans Yönetimi",
+    description: "Türk işletmeleri için geliştirilmiş modern muhasebe uygulaması.",
+    images: ["/screenshots/dashboard.png"],
+  },
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
