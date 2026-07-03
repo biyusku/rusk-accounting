@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useDashboardPrefs, type DashboardPrefs } from "@/contexts/dashboard-prefs";
 import { BankIntegrationsSection } from "@/components/layout/bank-integrations-section";
 import { toast } from "sonner";
 
@@ -97,56 +98,104 @@ function AccountSection({ onSave }: { onSave: () => void }) {
   );
 }
 
+const WIDGET_ITEMS: { key: keyof DashboardPrefs; label: string; desc: string }[] = [
+  { key: "showKPICards", label: "KPI Kartları", desc: "Gelir, gider, kar ve fatura özet kartları" },
+  { key: "showCurrencyMarquee", label: "Döviz Kuru Bandı", desc: "Üstteki canlı döviz kuru kaydırması" },
+  { key: "showAccountsOverview", label: "Hesaplar", desc: "Banka hesapları özet kartları" },
+  { key: "showTransactionsFeed", label: "Son Hareketler", desc: "Son 5 hesap hareketi listesi" },
+  { key: "showQuickActions", label: "Hızlı İşlemler", desc: "Transfer, fatura, ödeme kısayolları" },
+  { key: "showAccountBalances", label: "Hesap Bakiyeleri", desc: "Detaylı hesap bakiye listesi" },
+  { key: "showInvoiceStatus", label: "Fatura Durumu", desc: "Bekleyen ve ödenen fatura özeti" },
+  { key: "showBudgetMini", label: "Bütçe Özeti", desc: "Kategori bazlı bütçe kullanım çubukları" },
+];
+
 function AppearanceSection({ onSave }: { onSave: () => void }) {
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
+  const { prefs, setPref } = useDashboardPrefs();
 
   return (
     <div className="space-y-5">
       <div>
         <h3 className="text-base font-medium">Görünüm</h3>
-        <p className="text-sm text-muted-foreground">Tema ve font tercihlerinizi özelleştirin.</p>
+        <p className="text-sm text-muted-foreground">Tema ve dashboard widget tercihlerinizi özelleştirin.</p>
       </div>
       <Separator />
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <Label>Font</Label>
-          <Select defaultValue="inter">
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="inter">Inter</SelectItem>
-              <SelectItem value="manrope">Manrope</SelectItem>
-              <SelectItem value="system">Sistem Fontu</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Tema</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["light", "dark", "system"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTheme(t)}
-                className={cn(
-                  "flex flex-col items-center gap-2 rounded-lg border-2 p-2.5 transition-colors",
-                  theme === t ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
-                )}
-              >
-                <div className={cn(
-                  "h-6 w-full rounded border",
-                  t === "light" && "bg-white",
-                  t === "dark" && "bg-zinc-900",
-                  t === "system" && "bg-gradient-to-r from-white to-zinc-900"
-                )} />
-                <span className="text-xs text-muted-foreground">
-                  {t === "light" ? "Açık" : t === "dark" ? "Koyu" : "Sistem"}
-                </span>
-              </button>
-            ))}
-          </div>
+
+      {/* Tema */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Tema</Label>
+        <div className="grid grid-cols-3 gap-2 max-w-xs">
+          {(["light", "dark", "system"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTheme(t)}
+              className={cn(
+                "flex flex-col items-center gap-2 rounded-lg border-2 p-2.5 transition-colors",
+                theme === t ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+              )}
+            >
+              <div className={cn(
+                "h-6 w-full rounded border",
+                t === "light" && "bg-white",
+                t === "dark" && "bg-zinc-900",
+                t === "system" && "bg-gradient-to-r from-white to-zinc-900"
+              )} />
+              <span className="text-xs text-muted-foreground">
+                {t === "light" ? "Açık" : t === "dark" ? "Koyu" : "Sistem"}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
-      <Button size="sm" onClick={onSave}>Görünümü Güncelle</Button>
+
+      <Separator />
+
+      {/* Dashboard Widget'ları */}
+      <div className="space-y-3">
+        <div>
+          <Label className="text-sm font-medium">Dashboard Widget'ları</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">Hangi bölümlerin gösterileceğini seçin.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {WIDGET_ITEMS.map((item) => (
+            <div
+              key={item.key}
+              className={cn(
+                "flex items-center justify-between rounded-xl border p-3 transition-colors cursor-pointer",
+                prefs[item.key] ? "border-primary/30 bg-primary/[0.03]" : "border-border opacity-60"
+              )}
+              onClick={() => setPref(item.key, !prefs[item.key])}
+            >
+              <div className="min-w-0 mr-2">
+                <p className="text-xs font-medium truncate">{item.label}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{item.desc}</p>
+              </div>
+              <Switch
+                checked={prefs[item.key]}
+                onCheckedChange={(v) => setPref(item.key, v)}
+                className="scale-[0.8] shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const keys: (keyof DashboardPrefs)[] = WIDGET_ITEMS.map(i => i.key);
+            keys.forEach(k => setPref(k, true));
+            toast.success("Tüm widget'lar sıfırlandı.");
+          }}
+        >
+          Tümünü Sıfırla
+        </Button>
+        <p className="text-xs text-muted-foreground">Değişiklikler anında uygulanıyor</p>
+      </div>
     </div>
   );
 }
