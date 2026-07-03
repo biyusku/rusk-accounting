@@ -8,7 +8,6 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
   CheckCircle2,
-  Circle,
   ExternalLink,
   Loader2,
   Lock,
@@ -19,7 +18,9 @@ import {
   BarChart3,
   FileText,
   RefreshCw,
-  AlertTriangle,
+  Unplug,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,75 +38,37 @@ interface Bank {
   name: string;
   shortName: string;
   logo: string;
-  color: string;
-  status: "connected" | "disconnected" | "pending";
+  logoUrl: string;
+  bgColor: string;
+  textColor: string;
+  status: "connected" | "disconnected" | "connecting";
   docUrl: string;
   authType: string;
+  description: string;
   apis: BankAPI[];
 }
 
-const BANKS: Bank[] = [
+const INITIAL_BANKS: Bank[] = [
   {
     id: "isbank",
     name: "Türkiye İş Bankası",
     shortName: "İş Bankası",
     logo: "İŞ",
-    color: "bg-blue-600",
+    logoUrl: "/logos/isbank.png",
+    bgColor: "bg-[#EF2D73]",
+    textColor: "text-white",
     status: "connected",
     docUrl: "https://developer.isbank.com.tr",
     authType: "OAuth 2.0 + API Key",
+    description: "Hesap hareketleri, para transferi, ödeme ve döviz kuru API'leri",
     apis: [
-      {
-        id: "isbank-accounts",
-        name: "Hesap Bilgileri",
-        description: "Hesap bakiyesi, IBAN ve hesap hareketlerine erişim (5 API)",
-        icon: <Building2 className="h-3.5 w-3.5" />,
-        enabled: true,
-      },
-      {
-        id: "isbank-transfer",
-        name: "Para Aktarma",
-        description: "Havale, EFT ve FAST işlemleri (7 API)",
-        icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
-        enabled: true,
-      },
-      {
-        id: "isbank-payments",
-        name: "Ödemeler",
-        description: "Fatura ödeme, POS hizmetleri ve kredi kartı borç ödeme (14 API)",
-        icon: <CreditCard className="h-3.5 w-3.5" />,
-        enabled: true,
-      },
-      {
-        id: "isbank-cards",
-        name: "Kartlar",
-        description: "Kredi kartı ve ön ödemeli kart hareketleri (6 API)",
-        icon: <CreditCard className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
-      {
-        id: "isbank-data",
-        name: "Veri Paylaşımı",
-        description: "Finansal veri ve raporlama (24 API)",
-        icon: <BarChart3 className="h-3.5 w-3.5" />,
-        enabled: false,
-        beta: true,
-      },
-      {
-        id: "isbank-fx",
-        name: "Döviz Kuru",
-        description: "TCMB ve İş Bankası kanallarından gerçek zamanlı kur bilgisi",
-        icon: <RefreshCw className="h-3.5 w-3.5" />,
-        enabled: true,
-      },
-      {
-        id: "isbank-invoices",
-        name: "Tedarikçi Finansmanı",
-        description: "Fatura iskonto ve tedarikçi ödeme yönetimi",
-        icon: <FileText className="h-3.5 w-3.5" />,
-        enabled: false,
-        beta: true,
-      },
+      { id: "isbank-accounts", name: "Hesap Bilgileri", description: "Bakiye ve IBAN sorgulama (5 API)", icon: <Building2 className="h-3.5 w-3.5" />, enabled: true },
+      { id: "isbank-transfer", name: "Para Aktarma", description: "Havale, EFT, FAST (7 API)", icon: <ArrowRightLeft className="h-3.5 w-3.5" />, enabled: true },
+      { id: "isbank-payments", name: "Ödemeler", description: "Fatura ödeme ve POS (14 API)", icon: <CreditCard className="h-3.5 w-3.5" />, enabled: true },
+      { id: "isbank-cards", name: "Kartlar", description: "Kredi kartı hareketleri (6 API)", icon: <CreditCard className="h-3.5 w-3.5" />, enabled: false },
+      { id: "isbank-data", name: "Veri Paylaşımı", description: "Finansal raporlama (24 API)", icon: <BarChart3 className="h-3.5 w-3.5" />, enabled: false, beta: true },
+      { id: "isbank-fx", name: "Döviz Kuru", description: "TCMB ve İş Bankası kurları", icon: <RefreshCw className="h-3.5 w-3.5" />, enabled: true },
+      { id: "isbank-supplier", name: "Tedarikçi Finansmanı", description: "Fatura iskonto yönetimi", icon: <FileText className="h-3.5 w-3.5" />, enabled: false, beta: true },
     ],
   },
   {
@@ -113,40 +76,18 @@ const BANKS: Bank[] = [
     name: "Akbank T.A.Ş.",
     shortName: "Akbank",
     logo: "AK",
-    color: "bg-red-600",
+    logoUrl: "/logos/akbank.png",
+    bgColor: "bg-[#E31E24]",
+    textColor: "text-white",
     status: "disconnected",
     docUrl: "https://apiportal.akbank.com",
     authType: "OAuth 2.0 + Client Secret",
+    description: "Döviz kurları, kredi oranları, sanal POS ve şube/ATM verileri",
     apis: [
-      {
-        id: "akbank-fx",
-        name: "Döviz Kurları",
-        description: "Seçilen tarihe ait Akbank döviz kur listesi",
-        icon: <RefreshCw className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
-      {
-        id: "akbank-credit-rates",
-        name: "Kredi Faiz Oranları",
-        description: "İhtiyaç, konut ve taşıt kredisi güncel faiz oranları",
-        icon: <BarChart3 className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
-      {
-        id: "akbank-payment-plan",
-        name: "Kredi Ödeme Planı",
-        description: "Seçilen kredi faizi ve vadesi için ödeme planı hesaplama",
-        icon: <FileText className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
-      {
-        id: "akbank-pos",
-        name: "VirtualPOS & Cebe POS",
-        description: "Sanal POS provizyonları ve Cebe POS işlem durumu",
-        icon: <CreditCard className="h-3.5 w-3.5" />,
-        enabled: false,
-        beta: true,
-      },
+      { id: "akbank-fx", name: "Döviz Kurları", description: "Tarihsel ve anlık kur verisi", icon: <RefreshCw className="h-3.5 w-3.5" />, enabled: false },
+      { id: "akbank-credit-rates", name: "Kredi Faiz Oranları", description: "İhtiyaç, konut, taşıt kredisi oranları", icon: <BarChart3 className="h-3.5 w-3.5" />, enabled: false },
+      { id: "akbank-payment-plan", name: "Kredi Ödeme Planı", description: "Vade bazlı ödeme hesaplama", icon: <FileText className="h-3.5 w-3.5" />, enabled: false },
+      { id: "akbank-pos", name: "VirtualPOS & Cebe POS", description: "Sanal POS ve mobil POS işlemleri", icon: <CreditCard className="h-3.5 w-3.5" />, enabled: false, beta: true },
     ],
   },
   {
@@ -154,25 +95,17 @@ const BANKS: Bank[] = [
     name: "Garanti BBVA",
     shortName: "Garanti",
     logo: "GB",
-    color: "bg-emerald-600",
+    logoUrl: "/logos/garanti.png",
+    bgColor: "bg-[#009639]",
+    textColor: "text-white",
     status: "disconnected",
     docUrl: "https://developer.garantibbva.com.tr",
-    authType: "OAuth 2.0",
+    authType: "OAuth 2.0 (PSD2)",
+    description: "PSD2 uyumlu açık bankacılık hesap ve ödeme başlatma API'leri",
     apis: [
-      {
-        id: "garanti-accounts",
-        name: "Hesap & Bakiye",
-        description: "PSD2 uyumlu hesap bilgisi ve bakiye sorgulama",
-        icon: <Building2 className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
-      {
-        id: "garanti-payments",
-        name: "Ödeme Başlatma",
-        description: "PSD2 uyumlu ödeme başlatma hizmetleri",
-        icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
+      { id: "garanti-accounts", name: "Hesap & Bakiye", description: "PSD2 hesap bilgisi sorgulama", icon: <Building2 className="h-3.5 w-3.5" />, enabled: false },
+      { id: "garanti-payments", name: "Ödeme Başlatma", description: "PSD2 uyumlu ödeme hizmetleri", icon: <ArrowRightLeft className="h-3.5 w-3.5" />, enabled: false },
+      { id: "garanti-fx", name: "Döviz İşlemleri", description: "Döviz kuru ve çevrim hizmetleri", icon: <RefreshCw className="h-3.5 w-3.5" />, enabled: false },
     ],
   },
   {
@@ -180,219 +113,205 @@ const BANKS: Bank[] = [
     name: "Yapı ve Kredi Bankası",
     shortName: "Yapı Kredi",
     logo: "YK",
-    color: "bg-purple-600",
+    logoUrl: "/logos/ykb.png",
+    bgColor: "bg-[#5B2D8E]",
+    textColor: "text-white",
     status: "disconnected",
     docUrl: "https://developer.yapikredi.com.tr",
     authType: "OAuth 2.0",
+    description: "Hesap hizmetleri, EFT/FAST/havale ve kart işlem API'leri",
     apis: [
-      {
-        id: "ykb-accounts",
-        name: "Hesap Hizmetleri",
-        description: "Hesap bilgileri ve işlem geçmişi",
-        icon: <Building2 className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
-      {
-        id: "ykb-payments",
-        name: "Ödeme Hizmetleri",
-        description: "EFT, FAST ve havale işlemleri",
-        icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
-        enabled: false,
-      },
+      { id: "ykb-accounts", name: "Hesap Hizmetleri", description: "Hesap bilgileri ve işlem geçmişi", icon: <Building2 className="h-3.5 w-3.5" />, enabled: false },
+      { id: "ykb-payments", name: "Ödeme Hizmetleri", description: "EFT, FAST ve havale işlemleri", icon: <ArrowRightLeft className="h-3.5 w-3.5" />, enabled: false },
+      { id: "ykb-cards", name: "Kart Hizmetleri", description: "Kredi kartı hareketleri ve limit sorgusu", icon: <CreditCard className="h-3.5 w-3.5" />, enabled: false },
     ],
   },
 ];
 
-const STATUS_CONFIG = {
-  connected: { label: "Bağlı", className: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="h-3 w-3" /> },
-  disconnected: { label: "Bağlı Değil", className: "bg-gray-100 text-gray-600 border-gray-200", icon: <Circle className="h-3 w-3" /> },
-  pending: { label: "Bekliyor", className: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
-};
-
 function BankCard({ bank: initialBank }: { bank: Bank }) {
   const [bank, setBank] = useState(initialBank);
-  const [connecting, setConnecting] = useState(false);
-  const [expanded, setExpanded] = useState(bank.status === "connected");
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const toggleAPI = (apiId: string) => {
-    if (bank.status !== "connected") return;
-    setBank((prev) => ({
-      ...prev,
-      apis: prev.apis.map((api) =>
-        api.id === apiId ? { ...api, enabled: !api.enabled } : api
-      ),
-    }));
-  };
+  const enabledCount = bank.apis.filter((a) => a.enabled).length;
+  const isConnected = bank.status === "connected";
 
   const handleConnect = () => {
-    setConnecting(true);
+    setLoading(true);
     setTimeout(() => {
-      setConnecting(false);
-      toast.info(`${bank.shortName} entegrasyonu için geliştirici portalına yönlendiriliyorsunuz...`);
-      window.open(bank.docUrl, "_blank");
-    }, 800);
+      setLoading(false);
+      setBank((b) => ({ ...b, status: "connected" }));
+      setExpanded(true);
+      toast.success(`${bank.shortName} başarıyla bağlandı!`);
+    }, 1400);
   };
 
   const handleDisconnect = () => {
-    setBank((prev) => ({ ...prev, status: "disconnected" }));
+    setBank((b) => ({
+      ...b,
+      status: "disconnected",
+      apis: b.apis.map((a) => ({ ...a, enabled: false })),
+    }));
     setExpanded(false);
-    toast.success(`${bank.shortName} bağlantısı kesildi.`);
+    toast.info(`${bank.shortName} bağlantısı kesildi.`);
   };
 
-  const statusCfg = STATUS_CONFIG[bank.status];
-  const enabledCount = bank.apis.filter((a) => a.enabled).length;
+  const toggleAPI = (apiId: string) => {
+    setBank((b) => ({
+      ...b,
+      apis: b.apis.map((a) => a.id === apiId ? { ...a, enabled: !a.enabled } : a),
+    }));
+  };
 
   return (
     <div className={cn(
-      "rounded-xl border transition-all",
-      bank.status === "connected" ? "border-primary/20 bg-primary/[0.02]" : "border-border"
+      "rounded-2xl border-2 transition-all duration-300 overflow-hidden",
+      isConnected
+        ? "border-emerald-400/60 shadow-sm shadow-emerald-100"
+        : "border-border hover:border-muted-foreground/20",
+      expanded && "col-span-2"
     )}>
-      <div className="flex items-center gap-4 p-4">
-        {/* Logo */}
-        <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center text-[11px] font-black text-white shrink-0", bank.color)}>
-          {bank.logo}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold">{bank.name}</p>
-            <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border", statusCfg.className)}>
-              {statusCfg.icon}
-              {statusCfg.label}
-            </span>
-            {bank.status === "connected" && (
-              <span className="text-[10px] text-muted-foreground">
-                {enabledCount}/{bank.apis.length} API aktif
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-              <Lock className="h-2.5 w-2.5" />
-              {bank.authType}
-            </span>
-            <a
-              href={bank.docUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-primary hover:underline flex items-center gap-0.5"
-            >
-              Dokümantasyon
-              <ExternalLink className="h-2.5 w-2.5" />
-            </a>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {bank.status === "connected" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground"
-              onClick={() => setExpanded((e) => !e)}
-            >
-              {expanded ? "Gizle" : "API'leri Yönet"}
-            </Button>
-          )}
-          {bank.status === "connected" ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-3 text-xs text-red-600 border-red-200 hover:bg-red-50"
-              onClick={handleDisconnect}
-            >
-              Bağlantıyı Kes
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              className="h-7 px-3 text-xs"
-              onClick={handleConnect}
-              disabled={connecting}
-            >
-              {connecting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
-              {connecting ? "Bağlanıyor..." : "Bağlan"}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* API List */}
-      {expanded && bank.status === "connected" && (
-        <div className="border-t mx-4 mb-4 pt-3 space-y-2">
-          <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-2">Aktif API'ler</p>
-          {bank.apis.map((api) => (
-            <div key={api.id} className="flex items-center justify-between rounded-lg hover:bg-muted/40 px-2 py-2 transition-colors">
-              <div className="flex items-center gap-2.5">
-                <span className="text-muted-foreground">{api.icon}</span>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-medium">{api.name}</p>
-                    {api.beta && (
-                      <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-yellow-300 text-yellow-700 bg-yellow-50">BETA</Badge>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">{api.description}</p>
-                </div>
-              </div>
-              <Switch
-                checked={api.enabled}
-                onCheckedChange={() => toggleAPI(api.id)}
-                className="scale-75"
+      <div className={cn("flex", expanded ? "flex-row" : "flex-col")}>
+        {/* Sol — Banka Bilgisi */}
+        <div className={cn("p-4 flex flex-col gap-3", expanded ? "w-56 shrink-0 border-r" : "")}>
+          {/* Logo + İsim */}
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl overflow-hidden border bg-white flex items-center justify-center shrink-0 shadow-sm">
+              <img
+                src={bank.logoUrl}
+                alt={bank.name}
+                className="h-9 w-9 object-contain"
+                onError={(e) => {
+                  const t = e.currentTarget;
+                  t.style.display = "none";
+                  if (t.parentElement) t.parentElement.innerHTML = `<span class="text-xs font-black">${bank.logo}</span>`;
+                }}
               />
             </div>
-          ))}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-sm font-semibold leading-tight truncate">{bank.name}</p>
+              </div>
+              {isConnected && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full mt-0.5">
+                  <CheckCircle2 className="h-2.5 w-2.5" />
+                  Bağlı
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Açıklama — sadece kapalıyken */}
+          {!expanded && (
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{bank.description}</p>
+          )}
+
+          {/* Butonlar */}
+          <div className={cn("flex items-center gap-2", expanded ? "mt-auto" : "pt-1 border-t border-dashed")}>
+            {isConnected ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setExpanded((e) => !e)}
+                  className={cn(
+                    "flex-1 text-[11px] font-medium px-3 py-2 rounded-lg border transition-all flex items-center justify-between gap-1 min-w-0",
+                    expanded
+                      ? "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                      : "border-border hover:bg-muted/50 text-foreground hover:border-primary/40"
+                  )}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Zap className="h-3 w-3 text-primary" />
+                    <span>{enabledCount}/{bank.apis.length} API Aktif</span>
+                  </span>
+                  {expanded
+                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  title="Bağlantıyı kes"
+                  className="h-8 w-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors shrink-0"
+                >
+                  <Unplug className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-8 text-xs gap-1.5 font-medium"
+                onClick={handleConnect}
+                disabled={loading}
+              >
+                {loading
+                  ? <><Loader2 className="h-3 w-3 animate-spin" />Bağlanıyor...</>
+                  : <><Zap className="h-3 w-3" />Bağlan</>}
+              </Button>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Sağ — API Paneli */}
+        {isConnected && expanded && (
+          <div className="flex-1 bg-muted/20 p-4 overflow-y-auto">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
+              API Yönetimi — {bank.shortName}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {bank.apis.map((api) => (
+                <div
+                  key={api.id}
+                  className={cn(
+                    "flex items-center justify-between rounded-xl px-3 py-2 transition-colors",
+                    api.enabled ? "bg-background shadow-sm border" : "hover:bg-muted/60 border border-transparent"
+                  )}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={cn("shrink-0", api.enabled ? "text-primary" : "text-muted-foreground")}>
+                      {api.icon}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs font-medium truncate">{api.name}</p>
+                        {api.beta && (
+                          <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-amber-300 text-amber-700 bg-amber-50 shrink-0">
+                            BETA
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={api.enabled}
+                    onCheckedChange={() => toggleAPI(api.id)}
+                    className="scale-[0.75] shrink-0 ml-2"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 export function BankIntegrationsSection() {
-  const connectedCount = BANKS.filter((b) => b.status === "connected").length;
+  const [banks] = useState(INITIAL_BANKS);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div>
         <h3 className="text-base font-medium">Banka Entegrasyonları</h3>
         <p className="text-sm text-muted-foreground">
-          Banka API'lerini bağlayın ve finans verilerinizi otomatik senkronize edin.
+          Banka API'lerini bağlayın, finans verilerinizi otomatik senkronize edin.
         </p>
       </div>
       <Separator />
-
-      {/* Özet */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg border bg-muted/30 p-3 text-center">
-          <p className="text-2xl font-bold">{connectedCount}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Bağlı Banka</p>
-        </div>
-        <div className="rounded-lg border bg-muted/30 p-3 text-center">
-          <p className="text-2xl font-bold">{BANKS.reduce((s, b) => s + b.apis.filter(a => a.enabled).length, 0)}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Aktif API</p>
-        </div>
-        <div className="rounded-lg border bg-muted/30 p-3 text-center">
-          <p className="text-2xl font-bold">{BANKS.length}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Desteklenen Banka</p>
-        </div>
-      </div>
-
-      {/* Uyarı */}
-      <div className="flex gap-2.5 rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 dark:border-yellow-900/30 p-3">
-        <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-xs font-medium text-yellow-800 dark:text-yellow-400">Güvenli Bağlantı</p>
-          <p className="text-[11px] text-yellow-700 dark:text-yellow-500 mt-0.5">
-            Tüm banka bağlantıları OAuth 2.0 ile şifrelenir. API anahtarlarınız sunucularımızda AES-256 ile depolanır. Hiçbir banka şifresi saklanmaz.
-          </p>
-        </div>
-      </div>
-
-      {/* Banka Kartları */}
-      <div className="space-y-3">
-        {BANKS.map((bank) => (
+      <div className="grid grid-cols-2 gap-3">
+        {banks.map((bank) => (
           <BankCard key={bank.id} bank={bank} />
         ))}
       </div>
