@@ -1,88 +1,73 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+} from "recharts";
 import { mockCashFlow } from "@/lib/mock-data";
-import { formatYAxis } from "@/lib/formatters";
+import { formatCurrency, formatYAxis } from "@/lib/formatters";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-function CustomTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
-  label?: string;
-}): React.JSX.Element | null {
-  if (!active || !payload) return null;
+const trendData = mockCashFlow.map((m) => ({
+  month: m.month,
+  net: m.gelir - m.gider,
+  gelir: m.gelir,
+  gider: m.gider,
+}));
+
+const lastNet = trendData[trendData.length - 1]?.net ?? 0;
+const prevNet = trendData[trendData.length - 2]?.net ?? 0;
+const change = prevNet !== 0 ? ((lastNet - prevNet) / Math.abs(prevNet)) * 100 : 0;
+const isPositive = lastNet >= 0;
+
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border bg-background p-3 shadow-md text-sm">
-      <p className="font-semibold mb-2">{label}</p>
+    <div className="rounded-xl border bg-background shadow-lg p-3 text-sm min-w-[140px]">
+      <p className="font-semibold mb-1.5 text-xs text-muted-foreground">{label}</p>
       {payload.map((p) => (
-        <div key={p.name} className="flex items-center justify-between gap-6">
-          <div className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
-            <span className="text-muted-foreground">{p.name === "gelir" ? "Gelir" : "Gider"}</span>
-          </div>
-          <span className="font-medium">
-            ₺{p.value.toLocaleString("tr-TR")}
-          </span>
+        <div key={p.name} className="flex justify-between gap-4 text-xs">
+          <span style={{ color: p.color }}>{p.name}</span>
+          <span className="font-mono">{formatCurrency(p.value)}</span>
         </div>
       ))}
     </div>
   );
 }
 
-export function CashFlowChart(): React.JSX.Element {
+export function CashFlowChart() {
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader>
-        <CardTitle>Nakit Akışı</CardTitle>
-        <CardDescription>Son 7 ay gelir ve gider karşılaştırması</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={mockCashFlow} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="gelirGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="giderGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-            <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-muted-foreground" />
-            <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12 }} className="text-muted-foreground" />
-            <Tooltip content={<CustomTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="gelir"
-              stroke="hsl(var(--chart-2))"
-              strokeWidth={2}
-              fill="url(#gelirGradient)"
-            />
-            <Area
-              type="monotone"
-              dataKey="gider"
-              stroke="hsl(var(--chart-1))"
-              strokeWidth={2}
-              fill="url(#giderGradient)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-        <div className="flex items-center justify-center gap-6 mt-3 text-sm">
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--chart-2))]" />
-            <span className="text-muted-foreground">Gelir</span>
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-semibold">Nakit Akışı</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">Son 6 ay gelir — gider trendi</p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--chart-1))]" />
-            <span className="text-muted-foreground">Gider</span>
+          <div className={cn(
+            "flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg",
+            isPositive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"
+          )}>
+            {isPositive
+              ? <TrendingUp className="h-3.5 w-3.5" />
+              : <TrendingDown className="h-3.5 w-3.5" />}
+            {change >= 0 ? "+" : ""}{change.toFixed(1)}%
           </div>
         </div>
+      </CardHeader>
+      <CardContent className="pt-2">
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+            <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 10 }} width={48} />
+            <Tooltip content={<CustomTooltip />} />
+            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
+            <Line type="monotone" dataKey="gelir" name="Gelir" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={{ r: 2.5 }} />
+            <Line type="monotone" dataKey="gider" name="Gider" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 2.5 }} strokeDasharray="4 2" />
+          </LineChart>
+        </ResponsiveContainer>
       </CardContent>
     </Card>
   );
