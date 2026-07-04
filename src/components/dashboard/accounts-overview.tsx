@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockAccounts } from "@/lib/mock-data";
+import { getAccounts } from "@/lib/api";
 import type { Account } from "@/types";
 import Link from "next/link";
 
@@ -70,6 +71,12 @@ function AccountCard({ account }: { account: Account }): React.JSX.Element {
 }
 
 export function AccountsOverview(): React.JSX.Element {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+
+  useEffect(() => {
+    getAccounts().then(setAccounts).catch(() => null);
+  }, []);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -83,8 +90,8 @@ export function AccountsOverview(): React.JSX.Element {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {mockAccounts.map((account) => (
-            <AccountCard key={account.id} account={account} />
+          {accounts.map((account) => (
+            <AccountCard key={String(account.id)} account={account} />
           ))}
         </div>
       </CardContent>

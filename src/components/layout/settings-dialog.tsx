@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -264,10 +264,15 @@ const SECTION_MAP = {
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTab?: string;
 }
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const [active, setActive] = useState("profile");
+export function SettingsDialog({ open, onOpenChange, defaultTab }: SettingsDialogProps) {
+  const [active, setActive] = useState(defaultTab ?? "profile");
+
+  useEffect(() => {
+    if (open && defaultTab) setActive(defaultTab);
+  }, [open, defaultTab]);
 
   const handleSave = () => {
     toast.success("Ayarlar kaydedildi.");

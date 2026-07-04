@@ -131,7 +131,7 @@ function AppearanceSection({ onSave }: { onSave: () => void }) {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label>Font</Label>
-          <Select value={font} onValueChange={setFont}>
+          <Select value={font} onValueChange={(v) => setFont(v ?? "inter")}>
             <SelectTrigger className="max-w-sm">
               <SelectValue />
             </SelectTrigger>

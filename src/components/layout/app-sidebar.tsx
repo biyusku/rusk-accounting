@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import {
   Home,
   Receipt,
@@ -15,6 +15,7 @@ import {
   LogOut,
   HelpCircle,
   ChevronsUpDown,
+  Shield,
   type LucideIcon,
 } from "lucide-react"
 
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import { SettingsDialog } from "@/components/layout/settings-dialog"
+import { UserManagementDialog } from "@/components/auth/UserManagementDialog"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -71,13 +73,40 @@ const user = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const router = useRouter()
   const { state, setOpenMobile } = useSidebar()
   const collapsed = state === "collapsed"
   const closeMobile = () => setOpenMobile(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [userMgmtOpen, setUserMgmtOpen] = useState(false)
+  const [sessionUser, setSessionUser] = useState<{ name: string | null; email: string; initials: string; emailMasked: string; role?: string } | null>(null)
 
-  const handleLogout = () => {
-    toast.success("Çıkış yapılıyor...")
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data: { name?: string | null; email?: string; role?: string }) => {
+        if (data.email) {
+          const name = data.name ?? data.email.split("@")[0] ?? "Kullanıcı";
+          const initials = name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+          const [localPart, domain] = data.email.split("@");
+          const emailMasked = `${localPart?.[0] ?? ""}***@${domain}`;
+          setSessionUser({ name, email: data.email, initials, emailMasked, role: data.role });
+        }
+      })
+      .catch(() => null);
+  }, []);
+
+  const displayUser = sessionUser ?? user;
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      toast.success("Çıkış yapıldı.");
+      router.push("/auth");
+      router.refresh();
+    } catch {
+      toast.error("Çıkış yapılırken hata oluştu.");
+    }
   }
 
   return (
@@ -154,16 +183,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 collapsed ? "justify-center px-0" : "gap-3 px-4"
               )}>
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-[11px] font-bold text-sidebar-primary-foreground">
-                  {user.initials}
+                  {displayUser.initials}
                 </div>
                 {!collapsed && (
                   <>
                     <div className="min-w-0 flex-1 text-left">
                       <p className="truncate text-[13px] font-semibold text-sidebar-foreground leading-tight">
-                        {user.name}
+                        {displayUser.name}
                       </p>
                       <p className="truncate text-[11px] text-sidebar-foreground/50 leading-tight mt-0.5">
-                      {user.emailMasked}
+                      {displayUser.emailMasked}
                     </p>
                     </div>
                     <ChevronsUpDown className="shrink-0 h-4 w-4 text-sidebar-foreground/40" />
@@ -180,10 +209,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <DropdownMenuLabel className="font-normal px-3 py-2">
                 <div className="flex flex-col gap-0.5">
                   <p className="text-[13px] font-semibold text-foreground truncate">
-                    {user.name}
+                    {displayUser.name}
                   </p>
                   <p className="text-[11px] text-muted-foreground truncate">
-                  {user.emailMasked}
+                  {displayUser.emailMasked}
                 </p>
                 </div>
               </DropdownMenuLabel>
@@ -196,6 +225,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Settings className="h-4 w-4 text-muted-foreground" />
                   Ayarlar
                 </DropdownMenuItem>
+                {sessionUser?.role === "admin" && (
+                  <DropdownMenuItem
+                    className="cursor-pointer flex items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-accent rounded-md"
+                    onSelect={() => setUserMgmtOpen(true)}
+                  >
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    Kullanıcı Yönetimi
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <Link
                     href="/help"
@@ -222,6 +260,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </Sidebar>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <UserManagementDialog open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
     </>
   )
 }

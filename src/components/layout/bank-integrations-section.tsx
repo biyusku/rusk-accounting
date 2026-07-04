@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   CheckCircle2,
   ExternalLink,
@@ -21,6 +30,8 @@ import {
   Unplug,
   ChevronDown,
   ChevronRight,
+  RefreshCcw,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -128,8 +139,15 @@ const INITIAL_BANKS: Bank[] = [
   },
 ];
 
-function BankCard({ bank: initialBank }: { bank: Bank }) {
-  const [bank, setBank] = useState(initialBank);
+interface BankConnectionRecord {
+  bankId: string;
+  status: "connected" | "disconnected" | "error";
+  lastSyncAt: string | null;
+  lastSyncStatus: "success" | "failed" | "never";
+  lastSyncError: string | null;
+}
+
+function BankCard({ bank: initialBank, connection }: { bank: Bank; connection?: BankConnectionRecord }) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -230,6 +248,15 @@ function BankCard({ bank: initialBank }: { bank: Bank }) {
                 </button>
                 <button
                   type="button"
+                  onClick={handleSync}
+                  disabled={syncLoading}
+                  title="Verileri şimdi senkronize et"
+                  className="h-8 w-8 rounded-lg border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0"
+                >
+                  {syncLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
                   onClick={handleDisconnect}
                   title="Bağlantıyı kes"
                   className="h-8 w-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors shrink-0"
@@ -295,11 +322,124 @@ function BankCard({ bank: initialBank }: { bank: Bank }) {
         )}
       </div>
     </div>
+
+    <Dialog open={credFormOpen} onOpenChange={setCredFormOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg overflow-hidden border flex items-center justify-center">
+              <span className="text-xs font-black">{bank.logo}</span>
+            </div>
+            {bank.shortName} API Bağlantısı
+          </DialogTitle>
+          <DialogDescription>
+            Credentials&apos;ları{" "}
+            <a href={bank.docUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline underline-offset-2">
+              {bank.docUrl.replace("https://", "")}
+            </a>{" "}
+            adresinden alabilirsiniz.
+          </DialogDescription>
+        </DialogHeader>
+        <CredentialsForm
+          bankId={bank.id}
+          authType={bank.authType}
+          loading={loading}
+          onSubmit={handleCredSubmit}
+          onCancel={() => setCredFormOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface CredentialsFormProps {
+  bankId: string;
+  authType: string;
+  loading: boolean;
+  onSubmit: (creds: { apiKey?: string; clientId?: string; clientSecret?: string }) => void;
+  onCancel: () => void;
+}
+
+function CredentialsForm({ bankId, authType, loading, onSubmit, onCancel }: CredentialsFormProps) {
+  const [apiKey, setApiKey] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+
+  const needsApiKey = ["ykb"].includes(bankId);
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    onSubmit({ apiKey: apiKey || undefined, clientId: clientId || undefined, clientSecret: clientSecret || undefined });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+      {needsApiKey ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="cred-apikey" className="text-sm">API Key</Label>
+          <Input
+            id="cred-apikey"
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            required
+            className="font-mono text-sm"
+          />
+        </div>
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="cred-clientid" className="text-sm">
+              Client ID {authType.includes("API Key") && "/ API Key"}
+            </Label>
+            <Input
+              id="cred-clientid"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              placeholder="Client ID"
+              required
+              className="font-mono text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cred-secret" className="text-sm">Client Secret</Label>
+            <Input
+              id="cred-secret"
+              type="password"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              placeholder="Client Secret"
+              required
+              className="font-mono text-sm"
+            />
+          </div>
+        </>
+      )}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+        <Lock className="h-3.5 w-3.5 shrink-0" />
+        Credentials şifreli olarak saklanır ve sadece API isteklerinde kullanılır.
+      </div>
+      <div className="flex gap-2 justify-end">
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>İptal</Button>
+        <Button type="submit" size="sm" disabled={loading} className="bg-emerald-600 hover:bg-emerald-500">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Bağlan & Test Et"}
+        </Button>
+      </div>
+    </form>
   );
 }
 
 export function BankIntegrationsSection() {
   const [banks] = useState(INITIAL_BANKS);
+  const [connections, setConnections] = useState<BankConnectionRecord[]>([]);
+
+  useEffect(() => {
+    fetch("/api/bank-connections")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: BankConnectionRecord[]) => setConnections(Array.isArray(data) ? data : []))
+      .catch(() => null);
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -312,7 +452,11 @@ export function BankIntegrationsSection() {
       <Separator />
       <div className="grid grid-cols-2 gap-3">
         {banks.map((bank) => (
-          <BankCard key={bank.id} bank={bank} />
+          <BankCard
+            key={bank.id}
+            bank={bank}
+            connection={connections.find((c) => c.bankId === bank.id)}
+          />
         ))}
       </div>
     </div>

@@ -5,14 +5,15 @@ import { MagicCard } from "@/components/ui/magic-card";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { mockAccounts } from "@/lib/mock-data";
+import { getAccounts } from "@/lib/api";
 import { formatIBAN } from "@/lib/formatters";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import type { Account } from "@/types";
 import { cn } from "@/lib/utils";
-import { Copy, Eye, EyeOff, Plus } from "lucide-react";
-import { useState } from "react";
+import { Copy, Eye, EyeOff, Plus, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { SettingsDialog } from "@/components/layout/settings-dialog";
 
 const TYPE_LABELS: Record<Account["type"], string> = {
   checking: "Vadesiz Hesap",
@@ -106,6 +107,17 @@ function AccountDetailCard({ account }: { account: Account }): React.JSX.Element
 }
 
 export default function AccountsPage(): React.JSX.Element {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    getAccounts()
+      .then(setAccounts)
+      .catch(() => toast.error("Hesaplar yüklenemedi"))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="space-y-6">
       <BlurFade delay={0} inView>
@@ -116,20 +128,46 @@ export default function AccountsPage(): React.JSX.Element {
               Bağlı tüm banka ve kredi kartı hesapları
             </p>
           </div>
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-500" onClick={() => setSettingsOpen(true)}>
             <Plus className="h-4 w-4" />
             Hesap Ekle
           </Button>
         </div>
       </BlurFade>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {mockAccounts.map((account, i) => (
-          <BlurFade key={account.id} delay={0.1 + i * 0.05} inView>
-            <AccountDetailCard account={account} />
-          </BlurFade>
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : accounts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center">
+            <Plus className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-semibold">Henüz hesap yok</p>
+            <p className="text-sm text-muted-foreground mt-1">İlk hesabınızı ekleyerek başlayın</p>
+          </div>
+          <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-500" onClick={() => setSettingsOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Hesap Ekle
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {accounts.map((account, i) => (
+            <BlurFade key={String(account.id)} delay={0.1 + i * 0.05} inView>
+              <AccountDetailCard account={account} />
+            </BlurFade>
+          ))}
+        </div>
+      )}
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        defaultTab="banks"
+      />
     </div>
   );
 }

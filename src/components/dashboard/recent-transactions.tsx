@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockTransactions } from "@/lib/mock-data";
+import { getTransactions } from "@/lib/api";
 import { formatCurrency, formatShortDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/types";
@@ -46,7 +47,13 @@ function TransactionItem({ txn }: { txn: Transaction }): React.JSX.Element {
 }
 
 export function RecentTransactions(): React.JSX.Element {
-  const recent = mockTransactions.slice(0, 6);
+  const [recent, setRecent] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    getTransactions()
+      .then((txns) => setRecent(txns.slice(0, 6)))
+      .catch(() => null);
+  }, []);
 
   return (
     <Card>
@@ -62,7 +69,7 @@ export function RecentTransactions(): React.JSX.Element {
       <CardContent>
         <AnimatedList delay={500} className="gap-2">
           {recent.map((txn) => (
-            <TransactionItem key={txn.id} txn={txn} />
+            <TransactionItem key={String(txn.id)} txn={txn} />
           ))}
         </AnimatedList>
       </CardContent>

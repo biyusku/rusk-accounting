@@ -1,25 +1,27 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { mockCashFlow } from "@/lib/mock-data";
+import { getTransactions } from "@/lib/api";
 import { formatCurrency, formatYAxis } from "@/lib/formatters";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { CashFlowData } from "@/types";
 
-const trendData = mockCashFlow.map((m) => ({
-  month: m.month,
-  net: m.gelir - m.gider,
-  gelir: m.gelir,
-  gider: m.gider,
-}));
-
-const lastNet = trendData[trendData.length - 1]?.net ?? 0;
-const prevNet = trendData[trendData.length - 2]?.net ?? 0;
-const change = prevNet !== 0 ? ((lastNet - prevNet) / Math.abs(prevNet)) * 100 : 0;
-const isPositive = lastNet >= 0;
+function buildCashFlow(transactions: { date: string; amount: number; type: string }[]): CashFlowData[] {
+  const months: Record<string, { gelir: number; gider: number }> = {};
+  transactions.forEach((t) => {
+    const d = new Date(t.date);
+    const key = d.toLocaleDateString("tr-TR", { month: "short", year: "2-digit" }) || `${d.getMonth() + 1}/${d.getFullYear()}`;
+    if (!months[key]) months[key] = { gelir: 0, gider: 0 };
+    if (t.type === "credit") months[key].gelir += t.amount;
+    else months[key].gider += t.amount;
+  });
+  return Object.entries(months).map(([month, v]) => ({ month, ...v })).slice(-7);
+}
 
 function CustomTooltip({ active, payload, label }: {
   active?: boolean;
@@ -41,6 +43,22 @@ function CustomTooltip({ active, payload, label }: {
 }
 
 export function CashFlowChart() {
+  const [trendData, setTrendData] = useState<(CashFlowData & { net: number })[]>([]);
+
+  useEffect(() => {
+    getTransactions()
+      .then((txns) => {
+        const cf = buildCashFlow(txns);
+        setTrendData(cf.map((m) => ({ ...m, net: m.gelir - m.gider })));
+      })
+      .catch(() => null);
+  }, []);
+
+  const lastNet = trendData[trendData.length - 1]?.net ?? 0;
+  const prevNet = trendData[trendData.length - 2]?.net ?? 0;
+  const change = prevNet !== 0 ? ((lastNet - prevNet) / Math.abs(prevNet)) * 100 : 0;
+  const isPositive = lastNet >= 0;
+
   return (
     <Card>
       <CardHeader className="pb-2">

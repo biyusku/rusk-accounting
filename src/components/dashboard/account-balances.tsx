@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockAccounts } from "@/lib/mock-data";
+import { getAccounts } from "@/lib/api";
 import { CURRENCY_SYMBOLS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { AccountBalancesSkeleton } from "@/components/dashboard/dashboard-skeletons";
 import type { Account } from "@/types";
 
 const TYPE_COLORS: Record<Account["type"], string> = {
@@ -17,19 +18,24 @@ const TYPE_COLORS: Record<Account["type"], string> = {
 
 export function AccountBalances(): React.JSX.Element {
   const [hidden, setHidden] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [usdRate, setUsdRate] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/exchange-rates")
-      .then((r) => r.json())
-      .then((data) => {
-        const usd = data.rates?.find((r: { currency: string; rate: number }) => r.currency === "USD/TRY");
-        if (usd) setUsdRate(usd.rate);
-      })
-      .catch(() => null);
+    Promise.all([
+      getAccounts(),
+      fetch("/api/exchange-rates").then((r) => r.json()).catch(() => ({ rates: [] })),
+    ]).then(([accs, rateData]) => {
+      setAccounts(accs);
+      const usd = rateData.rates?.find((r: { currency: string; rate: number }) => r.currency === "USD/TRY");
+      if (usd) setUsdRate(usd.rate);
+    }).catch(() => null).finally(() => setLoading(false));
   }, []);
 
-  const totalTRY = mockAccounts
+  if (loading) return <AccountBalancesSkeleton />;
+
+  const totalTRY = accounts
     .filter((a) => a.currency === "TRY")
     .reduce((s, a) => s + a.balance, 0);
 
@@ -67,14 +73,14 @@ export function AccountBalances(): React.JSX.Element {
         </div>
 
         <div className="space-y-1.5">
-          {mockAccounts.map((acc) => {
+          {accounts.map((acc) => {
             const symbol = CURRENCY_SYMBOLS[acc.currency];
             const abs = Math.abs(acc.balance);
             const isNeg = acc.balance < 0;
             const tryEquivalent = acc.currency === "USD" && usdRate ? acc.balance * usdRate : null;
             return (
               <div
-                key={acc.id}
+                key={String(acc.id)}
                 className="flex items-center justify-between rounded-lg px-2 py-2 hover:bg-muted/40 transition-colors"
               >
                 <div className="flex items-center gap-2">

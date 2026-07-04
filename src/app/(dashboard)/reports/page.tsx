@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import { mockCashFlow, mockBudgets, mockTransactions } from "@/lib/mock-data";
+import { getTransactions, getBudgets } from "@/lib/api";
+import type { Transaction, Budget, CashFlowData } from "@/types";
 import { formatCurrency, formatYAxis } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import {
@@ -29,36 +30,36 @@ const PERIODS = [
   { id: "ytd", label: "YTD 2026" },
 ];
 
-// Pie chart için gider kategorileri
-const pieData = mockBudgets
-  .map((b) => ({ name: b.category, value: b.spent }))
-  .sort((a, b) => b.value - a.value);
+function buildCashFlow(transactions: Transaction[]): CashFlowData[] {
+  const months: Record<string, { gelir: number; gider: number }> = {};
+  transactions.forEach((t) => {
+    const d = new Date(t.date);
+    const monthNames = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+    const key = monthNames[d.getMonth()] ?? `${d.getMonth() + 1}`;
+    if (!months[key]) months[key] = { gelir: 0, gider: 0 };
+    if (t.type === "credit") months[key].gelir += t.amount;
+    else months[key].gider += t.amount;
+  });
+  return Object.entries(months).map(([month, v]) => ({ month, ...v }));
+}
 
-// Kategori bazlı işlem özeti
-const categoryStats = Object.entries(
-  mockTransactions
-    .filter(t => t.type === "debit")
-    .reduce((acc, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {} as Record<string, number>)
-)
-  .map(([category, total]) => ({ category, total }))
-  .sort((a, b) => b.total - a.total)
-  .slice(0, 6);
+function getFilteredData(cashFlow: CashFlowData[], period: string) {
+  const all = cashFlow.map((m, i, arr) => ({
+    ...m,
+    net: m.gelir - m.gider,
+    cumulative: arr.slice(0, i + 1).reduce((s, x) => s + (x.gelir - x.gider), 0),
+  }));
 
-// Aylık trend — nakit akışı + kümülatif
-const trendData = mockCashFlow.map((m, i, arr) => {
-  const net = m.gelir - m.gider;
-  const cumulative = arr.slice(0, i + 1).reduce((s, x) => s + (x.gelir - x.gider), 0);
-  return { ...m, net, cumulative };
-});
+  const chartData = period === "ytd" ? all : all.slice(-2);
+  const subset = period === "ytd" ? all : all.slice(-1);
 
-// Özet KPI
-const totalRevenue  = mockTransactions.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0);
-const totalExpenses = mockTransactions.filter(t => t.type === "debit").reduce((s, t) => s + t.amount, 0);
-const netProfit     = totalRevenue - totalExpenses;
-const profitMargin  = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+  const totalRevenue = subset.reduce((s, m) => s + m.gelir, 0);
+  const totalExpenses = subset.reduce((s, m) => s + m.gider, 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+  return { totalRevenue, totalExpenses, netProfit, profitMargin, chartData, barData: chartData };
+}
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
@@ -76,7 +77,40 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export default function ReportsPage(): React.JSX.Element {
-  const [period, setPeriod] = useState("this-month");
+  const [period, setPeriod] = useState("ytd");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+
+  useEffect(() => {
+    getTransactions().then(setTransactions).catch(() => null);
+    getBudgets().then(setBudgets).catch(() => null);
+  }, []);
+
+  const cashFlow = useMemo(() => buildCashFlow(transactions), [transactions]);
+  const { totalRevenue, totalExpenses, netProfit, profitMargin, chartData, barData } = useMemo(
+    () => getFilteredData(cashFlow, period),
+    [cashFlow, period]
+  );
+
+  const pieData = useMemo(
+    () => budgets.map((b) => ({ name: b.category, value: b.spent })).sort((a, b) => b.value - a.value),
+    [budgets]
+  );
+
+  const categoryStats = useMemo(() =>
+    Object.entries(
+      transactions
+        .filter(t => t.type === "debit")
+        .reduce((acc, t) => {
+          acc[t.category] = (acc[t.category] || 0) + t.amount;
+          return acc;
+        }, {} as Record<string, number>)
+    )
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6),
+    [transactions]
+  );
 
   const handleExport = () => {
     toast.success("Rapor hazırlanıyor… İndirilecek.");
@@ -177,7 +211,7 @@ export default function ReportsPage(): React.JSX.Element {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={mockCashFlow} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <BarChart data={barData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11 }} />
@@ -198,7 +232,7 @@ export default function ReportsPage(): React.JSX.Element {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11 }} />

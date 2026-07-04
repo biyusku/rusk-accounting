@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,15 @@ import { Separator } from "@/components/ui/separator";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { mockAccounts, mockTransactions } from "@/lib/mock-data";
+import { getAccounts, getTransactions } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { STATUS_MAP, TYPE_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
-  ArrowRightLeft, Zap, Building2, AlertCircle, Star, ChevronRight,
+  ArrowRightLeft, Zap, Building2, AlertCircle, Star, ChevronRight, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Transaction } from "@/types";
+import type { Account, Transaction } from "@/types";
 
 const SAVED_RECIPIENTS = [
   { id: "sr-1", name: "ABC Ltd. Şirketi", iban: "TR33 0006 1005 1978 6457 8413 26", bank: "İş Bankası", category: "Tedarikçi" },
@@ -41,20 +41,41 @@ const TRANSFER_TYPES = [
   { id: "havale", label: "Havale", desc: "Aynı banka, anlık", limit: "Limitsiz", icon: <ArrowRightLeft className="h-4 w-4 text-emerald-500" /> },
 ];
 
-const recentTransfers = mockTransactions
-  .filter((t) => t.type === "debit" && ["fast", "eft", "havale"].includes(t.transactionType))
-  .slice(0, 6);
-
 export default function TransfersPage(): React.JSX.Element {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [recentTransfers, setRecentTransfers] = useState<Transaction[]>([]);
   const [transferType, setTransferType] = useState("fast");
-  const [fromAccount, setFromAccount] = useState(mockAccounts[0]?.id ?? "");
+  const [fromAccount, setFromAccount] = useState("");
   const [iban, setIban] = useState("");
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    getAccounts().then((accs) => {
+      setAccounts(accs);
+      setFromAccount(String(accs[0]?.id ?? ""));
+    }).catch(() => null);
+    getTransactions().then((txns) => {
+      setRecentTransfers(
+        txns.filter((t) => t.type === "debit" && ["fast", "eft", "havale"].includes(t.transactionType)).slice(0, 6)
+      );
+    }).catch(() => null);
+  }, []);
   const [loading, setLoading] = useState(false);
 
-  const fromAcc = mockAccounts.find((a) => a.id === fromAccount);
+  const [ibanError, setIbanError] = useState("");
+
+  const validateIban = (value: string) => {
+    const raw = value.replace(/\s/g, "");
+    if (!raw) { setIbanError(""); return; }
+    if (!raw.startsWith("TR")) { setIbanError("Türk IBAN'ı TR ile başlamalıdır."); return; }
+    if (raw.length !== 26) { setIbanError(`IBAN ${raw.length} karakter — 26 karakter olmalı.`); return; }
+    if (!/^TR\d{24}$/.test(raw)) { setIbanError("IBAN yalnızca rakam içermelidir (TR sonrası)."); return; }
+    setIbanError("");
+  };
+
+  const fromAcc = accounts.find((a) => String(a.id) === fromAccount);
 
   const fillFromSaved = (r: typeof SAVED_RECIPIENTS[0]) => {
     setIban(r.iban);
@@ -133,13 +154,13 @@ export default function TransfersPage(): React.JSX.Element {
                 {/* Gönderen Hesap */}
                 <div className="space-y-1.5">
                   <Label>Gönderen Hesap</Label>
-                  <Select value={fromAccount} onValueChange={setFromAccount}>
+                  <Select value={fromAccount} onValueChange={(v) => setFromAccount(v ?? "")}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockAccounts.filter((a) => a.balance > 0).map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id}>
+                      {accounts.filter((a) => a.balance > 0).map((acc) => (
+                        <SelectItem key={String(acc.id)} value={String(acc.id)}>
                           <div className="flex items-center gap-2">
                             <span>{acc.name}</span>
                             <span className="text-muted-foreground text-xs font-mono">— {formatCurrency(acc.balance)}</span>
@@ -162,10 +183,17 @@ export default function TransfersPage(): React.JSX.Element {
                     <Input
                       placeholder="TR00 0000 0000 0000 0000 0000 00"
                       value={iban}
-                      onChange={(e) => setIban(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        setIban(e.target.value.toUpperCase());
+                        validateIban(e.target.value);
+                      }}
                       maxLength={32}
-                      className="font-mono"
+                      className={cn("font-mono", ibanError && "border-red-400 focus-visible:ring-red-400")}
                     />
+                    {ibanError && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{ibanError}</p>}
+                    {!ibanError && iban.replace(/\s/g, "").length === 26 && (
+                      <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Geçerli IBAN</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Alıcı Ad Soyad / Unvan <span className="text-red-500">*</span></Label>

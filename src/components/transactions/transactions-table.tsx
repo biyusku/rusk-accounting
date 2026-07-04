@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -29,14 +29,16 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { mockTransactions, mockAccounts } from "@/lib/mock-data";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { getTransactions, getAccounts } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { STATUS_MAP, TYPE_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { Transaction } from "@/types";
+import type { Transaction, Account } from "@/types";
 
-// Tüm kategorileri unique çek
-const ALL_CATEGORIES = ["Tümü", ...Array.from(new Set(mockTransactions.map((t) => t.category))).sort()];
+// Statik fallback — API'den gelen veriye göre dinamik üretilecek
+const ALL_CATEGORIES_FALLBACK = ["Tümü"]; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 const columns: ColumnDef<Transaction>[] = [
   {
@@ -112,8 +114,8 @@ const columns: ColumnDef<Transaction>[] = [
   },
 ];
 
-function TransactionDetail({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
-  const account = mockAccounts.find((a) => a.id === txn.accountId);
+function TransactionDetail({ txn, onClose, accounts }: { txn: Transaction; onClose: () => void; accounts: Account[] }) {
+  const account = accounts.find((a) => String(a.id) === txn.accountId);
   const status = STATUS_MAP[txn.status];
   const isCredit = txn.type === "credit";
 
@@ -182,19 +184,55 @@ function TransactionDetail({ txn, onClose }: { txn: Transaction; onClose: () => 
 }
 
 export function TransactionsTable(): React.JSX.Element {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("Tümü");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
 
+  useEffect(() => {
+    Promise.all([getTransactions(), getAccounts()])
+      .then(([txns, accs]) => { setTransactions(txns); setAccounts(accs); })
+      .catch(() => toast.error("İşlemler yüklenemedi"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const allCategories = useMemo(
+    () => ["Tümü", ...Array.from(new Set(transactions.map((t) => t.category))).sort()],
+    [transactions]
+  );
+
+  const DATE_PRESETS = [
+    { id: "all", label: "Tümü" },
+    { id: "this-month", label: "Bu Ay" },
+    { id: "last-month", label: "Geçen Ay" },
+    { id: "custom", label: "Özel" },
+  ];
+
   const filteredData = useMemo(() => {
-    return mockTransactions.filter((t) => {
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
+
+    return transactions.filter((t) => {
       if (typeFilter !== "all" && t.type !== typeFilter) return false;
       if (categoryFilter !== "Tümü" && t.category !== categoryFilter) return false;
+      if (dateFilter === "this-month" && t.date < thisMonthStart) return false;
+      if (dateFilter === "last-month" && (t.date < lastMonthStart || t.date > lastMonthEnd)) return false;
+      if (dateFilter === "custom") {
+        if (dateFrom && t.date < dateFrom) return false;
+        if (dateTo && t.date > dateTo) return false;
+      }
       return true;
     });
-  }, [typeFilter, categoryFilter]);
+  }, [transactions, typeFilter, categoryFilter, dateFilter, dateFrom, dateTo]);
 
   // Stat hesaplama
   const stats = useMemo(() => {
@@ -234,6 +272,14 @@ export function TransactionsTable(): React.JSX.Element {
     a.href = url; a.download = "islemler.csv"; a.click();
     URL.revokeObjectURL(url);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -275,7 +321,7 @@ export function TransactionsTable(): React.JSX.Element {
             className="pl-8"
           />
         </div>
-        <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); table.resetPageIndex(); }}>
+        <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v ?? "all"); table.resetPageIndex(); }}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Tür" />
           </SelectTrigger>
@@ -285,16 +331,39 @@ export function TransactionsTable(): React.JSX.Element {
             <SelectItem value="debit">Gider</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); table.resetPageIndex(); }}>
+        <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v ?? "Tümü"); table.resetPageIndex(); }}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Kategori" />
           </SelectTrigger>
           <SelectContent>
-            {ALL_CATEGORIES.map((c) => (
+            {allCategories.map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {/* Tarih filtresi */}
+        <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/30">
+          {DATE_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => { setDateFilter(p.id); table.resetPageIndex(); }}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                dateFilter === p.id ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2">
+            <Input type="date" className="h-9 w-36 text-xs" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <span className="text-xs text-muted-foreground">—</span>
+            <Input type="date" className="h-9 w-36 text-xs" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          </div>
+        )}
         <div className="ml-auto">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV}>
             <Download className="h-3.5 w-3.5" />
@@ -379,7 +448,7 @@ export function TransactionsTable(): React.JSX.Element {
 
       {/* Detay Drawer */}
       {selectedTxn && (
-        <TransactionDetail txn={selectedTxn} onClose={() => setSelectedTxn(null)} />
+        <TransactionDetail txn={selectedTxn} onClose={() => setSelectedTxn(null)} accounts={accounts} />
       )}
     </div>
   );

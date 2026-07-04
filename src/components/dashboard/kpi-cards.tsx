@@ -1,10 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, FileText, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockKPI } from "@/lib/mock-data";
+import { getTransactions, getInvoices } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatters";
+import { KPICardsSkeleton } from "@/components/dashboard/dashboard-skeletons";
+import type { KPIData } from "@/types";
 
 interface KPICardProps {
   title: string;
@@ -42,7 +45,7 @@ function KPICard({
       <CardContent>
         <div className="flex items-baseline gap-1">
           {prefix && <span className="text-lg font-semibold text-muted-foreground">{prefix}</span>}
-          <span className="text-3xl font-bold tracking-tight">
+          <span className="text-3xl font-bold tracking-tight font-mono tabular-nums">
             {decimalPlaces > 0 ? value.toFixed(decimalPlaces) : formatNumber(value)}
           </span>
           {suffix && <span className="text-lg font-semibold text-muted-foreground">{suffix}</span>}
@@ -63,7 +66,30 @@ function KPICard({
 }
 
 export function KPICards(): React.JSX.Element {
-  const kpi = mockKPI;
+  const [kpi, setKpi] = useState<KPIData | null>(null);
+
+  useEffect(() => {
+    Promise.all([getTransactions(), getInvoices()])
+      .then(([txns, invs]) => {
+        const totalRevenue = txns.filter(t => t.type === "credit").reduce((s, t) => s + t.amount, 0);
+        const totalExpenses = txns.filter(t => t.type === "debit").reduce((s, t) => s + t.amount, 0);
+        const pendingInvs = invs.filter(i => i.status === "pending" || i.status === "overdue");
+        setKpi({
+          totalRevenue,
+          totalExpenses,
+          netProfit: totalRevenue - totalExpenses,
+          pendingInvoices: pendingInvs.length,
+          pendingInvoicesAmount: pendingInvs.reduce((s, i) => s + i.amount, 0),
+          revenueChange: 0,
+          expensesChange: 0,
+          profitChange: 0,
+          pendingChange: 0,
+        });
+      })
+      .catch(() => null);
+  }, []);
+
+  if (!kpi) return <KPICardsSkeleton />;
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">

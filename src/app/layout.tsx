@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Providers } from "./providers";
 
-const inter = Inter({
+const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     "Türk işletmeleri için geliştirilmiş modern muhasebe uygulaması. Gelir/gider takibi, fatura yönetimi, banka entegrasyonu, FAST/EFT/Havale transferleri ve finansal raporlama.",
   keywords: [
     "muhasebe yazılımı",
-    "fatura yönetimi",
+    "fatura yönetimi",  
     "gelir gider takibi",
     "banka entegrasyonu",
     "FAST EFT havale",
@@ -63,7 +63,7 @@ export default function RootLayout({
   return (
     <html
       lang="tr"
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased overflow-x-hidden`}
+      className={`${plusJakartaSans.variable} ${jetbrainsMono.variable} h-full antialiased overflow-x-hidden`}
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background text-foreground overflow-x-hidden font-sans">

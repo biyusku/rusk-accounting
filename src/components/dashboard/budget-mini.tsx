@@ -1,13 +1,23 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { AlertTriangle, TrendingUp } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { mockBudgets } from "@/lib/mock-data";
+import { getBudgets } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import type { Budget } from "@/types";
 
 export function BudgetMini(): React.JSX.Element {
-  const top = mockBudgets
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+
+  useEffect(() => {
+    getBudgets().then(setBudgets).catch(() => null);
+  }, []);
+
+  const top = budgets
     .slice()
     .sort((a, b) => b.spent / b.limit - a.spent / a.limit)
     .slice(0, 4);
@@ -36,7 +46,7 @@ export function BudgetMini(): React.JSX.Element {
           const over = pct >= 90;
           const warn = pct >= 70;
           return (
-            <div key={b.id}>
+            <div key={String(b.id)}>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm">{b.icon}</span>

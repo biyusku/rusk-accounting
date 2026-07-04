@@ -1,6 +1,9 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockInvoices } from "@/lib/mock-data";
+import { getInvoices } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { Invoice } from "@/types";
@@ -16,9 +19,15 @@ const STATUS_CONFIG: Record<
 };
 
 export function InvoiceSummary(): React.JSX.Element {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  useEffect(() => {
+    getInvoices().then(setInvoices).catch(() => null);
+  }, []);
+
   const groups = (["paid", "pending", "overdue", "draft"] as Invoice["status"][]).map(
     (status) => {
-      const items = mockInvoices.filter((i) => i.status === status);
+      const items = invoices.filter((i) => i.status === status);
       return {
         status,
         count: items.length,
@@ -53,7 +62,7 @@ export function InvoiceSummary(): React.JSX.Element {
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground font-medium">Toplam</span>
             <span className="text-sm font-bold">
-              {formatCurrency(mockInvoices.reduce((s, i) => s + i.amount, 0))}
+              {formatCurrency(invoices.reduce((s, i) => s + i.amount, 0))}
             </span>
           </div>
         </div>

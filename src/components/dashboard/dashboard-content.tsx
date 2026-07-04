@@ -9,10 +9,38 @@ import { BudgetMini } from "@/components/dashboard/budget-mini";
 import { TransactionsFeed } from "@/components/dashboard/transactions-feed";
 import { AccountsOverview } from "@/components/dashboard/accounts-overview";
 import { CashFlowChart } from "@/components/dashboard/cash-flow-chart";
+import { OnboardingScreen } from "@/components/dashboard/onboarding-screen";
 import { useDashboardPrefs } from "@/contexts/dashboard-prefs";
+import { useState, useEffect } from "react";
+import type { Account } from "@/types";
 
 export function DashboardContent({ monthLabel, timeLabel }: { monthLabel: string; timeLabel: string }) {
   const { prefs } = useDashboardPrefs();
+  const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [fetchKey, setFetchKey] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/accounts")
+      .then((r) => r.json())
+      .then((data: Account[]) => setAccounts(Array.isArray(data) ? data : []))
+      .catch(() => setAccounts([]));
+  }, [fetchKey]);
+
+  // Yükleniyor
+  if (accounts === null) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="h-8 w-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // Veri yok → onboarding
+  if (accounts.length === 0) {
+    return (
+      <OnboardingScreen onComplete={() => setFetchKey((k) => k + 1)} />
+    );
+  }
 
   return (
     <div className="w-full space-y-5">

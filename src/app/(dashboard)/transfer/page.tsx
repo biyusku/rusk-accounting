@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,10 +26,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { mockAccounts } from "@/lib/mock-data";
+import { getAccounts } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatters";
 import { toast } from "sonner";
 import { SendHorizonal, Shield } from "lucide-react";
+import type { Account } from "@/types";
 
 const schema = z.object({
   fromAccountId: z.string().min(1, "Hesap seçin"),
@@ -48,9 +49,14 @@ const TRANSFER_INFO: Record<string, { label: string; desc: string; fee: string }
 };
 
 export default function TransferPage(): React.JSX.Element {
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [formValues, setFormValues] = useState<FormValues | null>(null);
+
+  useEffect(() => {
+    getAccounts().then(setAccounts).catch(() => null);
+  }, []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -83,7 +89,7 @@ export default function TransferPage(): React.JSX.Element {
 
   const selectedType = form.watch("transferType") as "havale" | "eft" | "fast";
   const typeInfo = TRANSFER_INFO[selectedType];
-  const fromAccount = mockAccounts.find((a) => a.id === form.watch("fromAccountId"));
+  const fromAccount = accounts.find((a) => String(a.id) === form.watch("fromAccountId"));
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -117,10 +123,10 @@ export default function TransferPage(): React.JSX.Element {
                     <SelectValue placeholder="Hesap seçin..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockAccounts
+                    {accounts
                       .filter((a) => a.type !== "credit" && a.currency === "TRY")
                       .map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
+                        <SelectItem key={String(a.id)} value={String(a.id)}>
                           {a.name} — ₺{a.balance.toLocaleString("tr-TR")}
                         </SelectItem>
                       ))}

@@ -1,20 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockTransactions } from "@/lib/mock-data";
+import { getTransactions } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { STATUS_MAP, TYPE_LABELS } from "@/lib/constants";
+import { TransactionsFeedSkeleton } from "@/components/dashboard/dashboard-skeletons";
+import type { Transaction } from "@/types";
 
 const FILTERS = ["Tümü", "Gelir", "Gider"] as const;
 type Filter = (typeof FILTERS)[number];
 
 export function TransactionsFeed(): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>("Tümü");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const data = mockTransactions.filter((t) => {
+  useEffect(() => {
+    getTransactions()
+      .then(setTransactions)
+      .catch(() => null)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <TransactionsFeedSkeleton />;
+
+  const data = transactions.filter((t) => {
     if (filter === "Gelir") return t.type === "credit";
     if (filter === "Gider") return t.type === "debit";
     return true;
@@ -53,7 +66,7 @@ export function TransactionsFeed(): React.JSX.Element {
             const status = STATUS_MAP[txn.status];
             return (
               <div
-                key={txn.id}
+                key={String(txn.id)}
                 className="flex items-center gap-3 px-6 py-3 hover:bg-muted/30 transition-colors"
               >
                 <div
